@@ -26,7 +26,18 @@ const rideSchema = new mongoose.Schema({
     },
     availableSeats:{
         type: Number,
-        required:true
+        required:true,
+        min:0            // It should be verified that min 1 while ride creation, but when all seats are booked it will be 0.
+    },
+    status:{
+        type: String,
+        enum:["active","completed","cancelled"],
+        default:"active"
+    },
+    price:{
+        type: Number,
+        required:true,
+        min:0
     },
     passengers:[{
         type: mongoose.Schema.Types.ObjectId,
@@ -36,4 +47,5 @@ const rideSchema = new mongoose.Schema({
 {
     timestamps:true
 });
+
 module.exports = mongoose.model("Ride", rideSchema);

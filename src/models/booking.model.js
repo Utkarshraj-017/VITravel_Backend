@@ -21,4 +21,12 @@ const bookingSchema = new mongoose.Schema ({
     timestamps:true
     
 });
+
+// Prevent duplicate bookings for the same user and ride combination
+bookingSchema.index(
+    { user: 1, ride: 1 }, 
+    { unique: true }
+);
+
+
 module.exports = mongoose.model("Booking", bookingSchema);
