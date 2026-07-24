@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema({
         required:true,
     },
     phone:{
-        type: Number,
+        type: String,
         required:true,
         unique:true
     },
@@ -29,11 +29,11 @@ const userSchema = new mongoose.Schema({
         type : Number,
         default : 0
     },
-    // foreign key
-    associatedRides:[{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Ride"
-    }]
+    // // foreign key
+    // associatedRides:[{
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: "Ride"
+    // }]
 
 },
 {
