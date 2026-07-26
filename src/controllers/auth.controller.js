@@ -18,20 +18,36 @@ const cookieOptions = {
 async function sendOTPController(req, res) {
     try {
 
-        const { phone } = req.body;
+        const { email } = req.body;
 
-        if (!phone) {
+        const normalizedEmail = email?.trim().toLowerCase();
+
+        if (!normalizedEmail) {
             return res.status(400).json({
-                message: "Phone number is required"
+                message: "Email is required"
             });
         }
 
-        await otpAuth.sendOTP(phone);
+        if (!normalizedEmail.endsWith("@vitbhopal.ac.in")) {
+            return res.status(400).json({
+                message: "Only VIT Bhopal email addresses are allowed"
+            });
+        }
+        const existingUser = await userModel.findOne({ email: normalizedEmail });
+
+        if (existingUser) {
+            return res.status(400).json({
+                message: "Email is already registered"
+            });
+        }
+
+        await otpAuth.sendOTP(normalizedEmail);
 
         return res.status(200).json({
             message: "OTP sent successfully"
         });
-    } catch (error) {
+    } 
+    catch (error) {
         console.error(error);
         return res.status(500).json({
             message: "Internal server error"
@@ -46,22 +62,24 @@ async function sendOTPController(req, res) {
 
 async function verifyOTPController(req, res) {
     try {
-        const { phone, otp } = req.body;
-        if (!phone || !otp) {
+        const { email, otp } = req.body;
+        const normalizedEmail = email?.trim().toLowerCase();
+
+        if (!normalizedEmail || !otp) {
             return res.status(400).json({
-                message: "Phone number and OTP are required"
+                message: "Email and OTP are required"
             });
         }
 
-        await otpAuth.verifyPhoneNumber(phone, otp);
+        await otpAuth.verifyEmail(normalizedEmail, otp);
 
         return res.status(200).json({
-            message: "Phone number verified successfully"
+            message: "Email verified successfully"
         });
     } catch (error) {
         console.error(error);
         return res.status(400).json({
-            message: "Invalid OTP"
+            message: error.message
         });
     }
 }
@@ -73,19 +91,21 @@ async function verifyOTPController(req, res) {
 
 async function registerController(req, res) {
     try {
-        const { name, username, password, phone } = req.body;
+        const { name, username, password, email, phone } = req.body;
+        const normalizedEmail = email?.trim().toLowerCase();
 
-        if (!name || !username || !password || !phone) {
+        if (!name || !username || !password || !normalizedEmail || !phone) {
             return res.status(400).json({
                 message: "All fields are required"
             });
         }
 
-        // check if user already exists with the same username or phone number
+        // check if user already exists with the same username or email or phone number
         const existingUser = await userModel.findOne({
             $or: [
                 { username },
-                { phone }
+                { phone },
+                { email : normalizedEmail }
             ]
         });
 
@@ -95,11 +115,11 @@ async function registerController(req, res) {
             });
         }
 
-        // Check if the phone number was verified
-        const isVerified = await otpAuth.isPhoneVerified(phone);
+        // Check if the email was verified
+        const isVerified = await otpAuth.isEmailVerified(normalizedEmail);
         if (!isVerified) {
             return res.status(400).json({
-                message: "Phone number is not verified"
+                message: "Email is not verified"
             });
         }
 
@@ -111,11 +131,12 @@ async function registerController(req, res) {
             username,
             password: hashedPassword,
             phone,
+            email : normalizedEmail,
             name
         });
 
         // Clear the verification status after successful registration : so it cant be reused for another registration
-        await otpAuth.clearVerification(phone);
+        await otpAuth.clearVerification(normalizedEmail);
 
 
         const token = jwt.sign(
@@ -220,5 +241,4 @@ module.exports = {
     registerController,
     loginController,
     logoutController
-
 }

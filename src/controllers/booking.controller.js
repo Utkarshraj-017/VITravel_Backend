@@ -59,7 +59,8 @@ const createBookingController = async (req, res) => {
         // Prevent duplicate booking
         const existingBooking = await bookingModel.findOne({
             user: userId,
-            ride: rideId
+            ride: rideId,
+            status: "confirmed"            // user can book the same ride again if previous booking was cancelled or completed
         });
 
         if (existingBooking) {
@@ -191,6 +192,14 @@ const cancelBookingController = async (req, res) => {
         if (booking.user.toString() !== userId.toString()) {
             return res.status(403).json({
                 message: "Unauthorized to cancel this booking"
+            });
+        }
+
+        const rideDateTime = new Date(`${ride.date.toISOString().split("T")[0]}T${ride.time}`);
+        // Cannot cancel if ride has already started
+        if (rideDateTime <= new Date()) {
+            return res.status(400).json({
+                message: "Ride has already started"
             });
         }
 
