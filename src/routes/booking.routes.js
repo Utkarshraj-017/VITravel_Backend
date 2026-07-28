@@ -6,7 +6,7 @@ const bookingController = require("../controllers/booking.controller");
 const router = express.Router();
 
 // Book a ride
-router.post("/", authMiddleware, bookingController.createBookingController);
+router.post("/create", authMiddleware, bookingController.createBookingController);
 
 // Get all bookings of logged-in user
 router.get("/my-bookings", authMiddleware, bookingController.getMyBookingsController);

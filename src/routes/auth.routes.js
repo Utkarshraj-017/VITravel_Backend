@@ -15,7 +15,7 @@ router.post("/verify-otp", authController.verifyOTPController);
 router.post("/register", authController.registerController);
 
 /* POST / api/auth/login */
-router.post("/login", loginLimiter, authController.loginController);
+router.post("/login", loginLimiter, authController.loginController);          // login limiter middle ware removed for now testing purpose 
 
 /* POST / api/auth/logout */
 router.post("/logout", authController.logoutController);

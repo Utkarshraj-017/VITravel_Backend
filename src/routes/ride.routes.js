@@ -4,11 +4,13 @@ const authMiddleware = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
+// api/rides/....
+
 router.post("/ride",authMiddleware,rideController.createRideController);
 
-router.get("/rides",authMiddleware,rideController.getAllRidesController);
+router.get("/",authMiddleware,rideController.getAllRidesController);
 
-router.get("/rides/my-rides",authMiddleware,rideController.getMyRidesController);
+router.get("/my-rides",authMiddleware,rideController.getMyRidesController);
 
 router.get("/rides/:id",authMiddleware,rideController.getRideByIdController);
 
