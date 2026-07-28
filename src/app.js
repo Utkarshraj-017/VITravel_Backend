@@ -26,4 +26,5 @@ app.use("/api/user", require("./routes/user.routes"));
 
 app.use("/api/bookings", require("./routes/booking.routes"));
 
+
 module.exports = app;

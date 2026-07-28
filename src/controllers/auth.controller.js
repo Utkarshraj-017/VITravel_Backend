@@ -28,11 +28,11 @@ async function sendOTPController(req, res) {
             });
         }
 
-        if (!normalizedEmail.endsWith("@vitbhopal.ac.in")) {
-            return res.status(400).json({
-                message: "Only VIT Bhopal email addresses are allowed"
-            });
-        }
+        // if (!normalizedEmail.endsWith("@vitbhopal.ac.in")) {
+        //     return res.status(400).json({
+        //         message: "Only VIT Bhopal email addresses are allowed"
+        //     });
+        // }
         const existingUser = await userModel.findOne({ email: normalizedEmail });
 
         if (existingUser) {
@@ -50,7 +50,7 @@ async function sendOTPController(req, res) {
     catch (error) {
         console.error(error);
         return res.status(500).json({
-            message: "Internal server error"
+            message: error.message
         });
     }
 }

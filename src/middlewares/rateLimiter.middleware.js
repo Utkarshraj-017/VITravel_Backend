@@ -3,7 +3,7 @@ const rateLimit = require("express-rate-limit");
 // Limit OTP requests
 const otpLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5,                   // Max 5 requests
+    max: 10,                   // Max 10 requests
     standardHeaders: true,
     legacyHeaders: false,
     message: {
