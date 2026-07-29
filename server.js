@@ -1,27 +1,29 @@
-require('dotenv').config();
+require("dotenv").config();
 
-const app = require('./src/app');
+const app = require("./src/app");
+const connectDB = require("./src/config/db");
+const transporter = require("./src/config/mail.config");
 
 const PORT = process.env.PORT || 5000;
 
-const connectDB = require('./src/config/db');
+const startServer = async () => {
+    try {
+        // 1. Connect to database
+        await connectDB();
 
-connectDB();
-
-app.listen(PORT, () => {
-
-    console.log(`Server running on port ${PORT}`);
-
-});
-
-//-----------------------------------------------------------------------------------
-
-const transporter = require("./src/config/mail.config");
-
-transporter.verify((error) => {
-    if (error) {
-        console.error("Mail server connection failed:", error);
-    } else {
+        // 2. Verify mail service
+        await transporter.verify();
         console.log("Mail server is ready.");
+
+        // 3. Start accepting requests only after dependencies are ready
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+        });
+
+    } catch (error) {
+        console.error("Server startup failed:", error);
+        process.exit(1);
     }
-});
+};
+
+startServer();
