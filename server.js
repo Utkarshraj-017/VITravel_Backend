@@ -16,7 +16,7 @@ const startServer = async () => {
         console.log("Mail server is ready.");
 
         // 3. Start accepting requests only after dependencies are ready
-        app.listen(PORT, () => {
+        app.listen(PORT, "0.0.0.0", () => {
             console.log(`Server running on port ${PORT}`);
         });
 
