@@ -25,8 +25,7 @@ const userSchema = new mongoose.Schema({
     },
     phone:{
         type: String,
-        required:true,
-        unique:true
+        default: null,
     },
     isBlacklisted:{
         type : Boolean,
