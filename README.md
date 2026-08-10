@@ -353,7 +353,6 @@ Example body:
   "name": "Test User",
   "username": "testuser",
   "email": "student@vitbhopal.ac.in",
-  "phone": "9876543210",
   "password": "password123"
 }
 ```
