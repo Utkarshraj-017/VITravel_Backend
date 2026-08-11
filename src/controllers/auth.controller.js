@@ -3,10 +3,12 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const otpAuth = require("../services/otpAuth.service");
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const cookieOptions = {
     httpOnly: true,                                // Hide cookie from frontend JS
-    secure: process.env.NODE_ENV === "production", // HTTPS only in production
-    sameSite: "strict",                            // CSRF protection
+    secure: isProduction,                          // HTTPS only in production
+    sameSite: isProduction ? "none" : "lax",      // Cross-site cookie when frontend is deployed separately
     maxAge: 2 * 24 * 60 * 60 * 1000                // 2 days expiry
 }
 
