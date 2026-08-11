@@ -93,10 +93,10 @@ async function verifyOTPController(req, res) {
 
 async function registerController(req, res) {
     try {
-        const { name, username, password, email, phone } = req.body;
+        const { name, username, password, email} = req.body;
         const normalizedEmail = email?.trim().toLowerCase();
 
-        if (!name || !username || !password || !normalizedEmail || !phone) {
+        if (!name || !username || !password || !normalizedEmail) {
             return res.status(400).json({
                 message: "All fields are required"
             });
@@ -106,7 +106,6 @@ async function registerController(req, res) {
         const existingUser = await userModel.findOne({
             $or: [
                 { username },
-                { phone },
                 { email : normalizedEmail }
             ]
         });
@@ -132,7 +131,6 @@ async function registerController(req, res) {
         const user = await userModel.create({
             username,
             password: hashedPassword,
-            phone,
             email : normalizedEmail,
             name
         });

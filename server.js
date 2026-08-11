@@ -10,13 +10,13 @@ const startServer = async () => {
     try {
         // 1. Connect to database
         await connectDB();
-
-        // 2. Verify mail service
-        await transporter.verify();
-        console.log("Mail server is ready.");
+        
+        // 2. Verify mail service : no needed as Resend handles this internally
+        // await transporter.verify();
+        // console.log("Mail server is ready.");
 
         // 3. Start accepting requests only after dependencies are ready
-        app.listen(PORT, () => {
+        app.listen(PORT, "0.0.0.0", () => {
             console.log(`Server running on port ${PORT}`);
         });
 

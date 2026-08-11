@@ -4,6 +4,8 @@ Backend API for **VITravels**, a ride-sharing platform designed for VIT Bhopal s
 
 This README is primarily intended to help frontend developers understand and integrate with the backend API.
 
+Note: AI tools were used for documentation, debugging, and troubleshooting assistance during the development & deployement process. However, AI tools were not used during the initial development or core implementation of the project.
+
 ---
 
 ## Tech Stack
@@ -15,7 +17,7 @@ This README is primarily intended to help frontend developers understand and int
 * JWT Authentication
 * bcrypt
 * Cookie-based authentication
-* Nodemailer for email OTP verification
+* Brevo API for email OTP verification
 
 ---
 
@@ -351,7 +353,6 @@ Example body:
   "name": "Test User",
   "username": "testuser",
   "email": "student@vitbhopal.ac.in",
-  "phone": "9876543210",
   "password": "password123"
 }
 ```
@@ -782,7 +783,7 @@ PORT=
 MONGO_URI=
 JWT_SECRET=
 EMAIL_USER=
-EMAIL_PASS=
+BREVO_API_KEY=
 ```
 
 ### Frontend

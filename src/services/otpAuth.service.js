@@ -2,55 +2,83 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 
 const EmailVerification = require("../models/emailVerification.model");
-const transporter = require("../config/mail.config");
+// const transporter = require("../config/mail.config");
 
 
 const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
 // Sends a 6-digit OTP to the given email.
+
 async function sendOTP(email) {
     try {
         // Generate a 6-digit OTP
         const otp = crypto.randomInt(100000, 1000000).toString();
 
-        // Hash and store it 
+        // Hash OTP before storing it
         const hashedOTP = await bcrypt.hash(otp, 10);
 
         // Remove any previous OTP for this email
         await EmailVerification.deleteOne({ email });
 
-        // Send the email
-        const tsp = await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: "Verify your VITravel Account",
-            html: `
-            <h2>Email Verification</h2>
+        // Send email using Brevo REST API
+        const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
 
-            <p>Your OTP for verifying your VITravel account is:</p>
+            headers: {
+                accept: "application/json",
+                "api-key": process.env.BREVO_API_KEY,
+                "content-type": "application/json"
+            },
 
-            <h1 style="letter-spacing: 4px;">${otp}</h1>
+            body: JSON.stringify({
+                sender: {
+                    name: "VITravels",
+                    email: process.env.EMAIL_USER
+                },
 
-            <p>This OTP is valid for <strong>5 minutes</strong>.</p>
+                to: [
+                    {
+                        email: email
+                    }
+                ],
 
-            <p>If you didn't request this, you can safely ignore this email.</p>
-        `
+                subject: "Verify your VITravel Account",
+
+                htmlContent: `
+                    <h2>Email Verification</h2>
+
+                    <p>Your OTP for verifying your VITravel account is:</p>
+
+                    <h1 style="letter-spacing: 4px;">${otp}</h1>
+
+                    <p>This OTP is valid for <strong>5 minutes</strong>.</p>
+
+                    <p>If you didn't request this, you can safely ignore this email.</p>
+                `
+            })
         });
 
-        // Store the OTP only after the email is sent successfully
-        const verf = await EmailVerification.create({
+        const result = await response.json();
+
+        // Brevo returned an error
+        if (!response.ok) {
+            console.error("Brevo API error:", result);
+            throw new Error(result.message || "Failed to send verification email");
+        }
+
+        console.log("Verification email sent:", result);
+
+        // Store OTP only after email was successfully sent
+        await EmailVerification.create({
             email,
             otp: hashedOTP,
             verified: false,
             expiresAt: new Date(Date.now() + OTP_EXPIRY)
         });
-        console.log(tsp);
-    }
-    catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            message: error.message
-        });
+
+    } catch (error) {
+        console.error("OTP sending error:", error);
+        throw error;
     }
 }
 
