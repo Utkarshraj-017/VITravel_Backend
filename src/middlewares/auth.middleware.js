@@ -8,7 +8,7 @@ async function authMiddleware(req, res, next) {
 
         if (!token) {
             return res.status(401).json({
-                message: "Unauthorized access"
+                message: "No Cookie or Authorization header found. Please login to access this resource."
             });
         }
 
