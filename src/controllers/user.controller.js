@@ -1,4 +1,5 @@
 const userModel = require('../models/user.model');
+const mongoose = require('mongoose');
 
 const getMyProfileController = async (req, res) => {
     try {

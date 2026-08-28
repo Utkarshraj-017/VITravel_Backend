@@ -545,7 +545,7 @@ Dashboard
 ## Create Ride
 
 ```http
-POST /api/rides
+POST /api/rides/ride
 ```
 
 This is a protected route.
@@ -565,7 +565,7 @@ Example body:
 Frontend request:
 
 ```js
-await fetch(`${API_URL}/api/rides`, {
+await fetch(`${API_URL}/api/rides/ride`, {
     method: "POST",
 
     headers: {
