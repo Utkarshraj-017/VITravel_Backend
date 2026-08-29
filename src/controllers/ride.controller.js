@@ -1,5 +1,14 @@
 const rideModel = require("../models/ride.model");
+const bookingModel = require("../models/booking.model");
 const mongoose = require("mongoose");
+
+// Attach an HTTP status to errors raised inside the ride-cancellation
+// transaction so the controller can return the correct API response.
+const createHttpError = (statusCode, message) => {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    return error;
+};
 
 const createRideController = async (req, res) => {
     try {
@@ -91,9 +100,20 @@ const getAllRidesController = async (req, res) => {
             };
         }
 
-        if (availableSeats) {
+        if (availableSeats !== undefined) {
+            const minimumSeats = Number(availableSeats);
+
+            if (!Number.isFinite(minimumSeats) || minimumSeats < 0) {
+                return res.status(400).json({
+                    message: "Available seats must be a non-negative number"
+                });
+            }
+
             filter.availableSeats = {
-                $gte: Number(availableSeats)
+                // Active ride listings must always have at least one seat,
+                // even when the requested minimum is zero.
+                $gt: 0,
+                $gte: minimumSeats
             };
         }
 
@@ -128,9 +148,20 @@ const getAllRidesController = async (req, res) => {
             .populate("creator", "name username")   // populate or display creator details with only name and username
             .sort({ date: 1, time: 1 });            // sort rides by date and time in ascending order
 
+        // The status service normally marks expired rides as completed. This
+        // application-side filter also hides them between service executions.
+        const currentTime = new Date();
+        const availableRides = rides.filter((ride) => {
+            const rideDateTime = new Date(
+                `${ride.date.toISOString().split("T")[0]}T${ride.time}`
+            );
+
+            return rideDateTime > currentTime;
+        });
+
         return res.status(200).json({
-            count: rides.length,
-            rides
+            count: availableRides.length,
+            rides: availableRides
         });
 
 
@@ -237,9 +268,24 @@ const updateRideController = async (req, res) => {
         }
 
         // Validate available seats
-        if (availableSeats !== undefined && (isNaN(Number(availableSeats)) || Number(availableSeats) < 0)) {
+        const requestedAvailableSeats = availableSeats !== undefined
+            ? Number(availableSeats)
+            : undefined;
+
+        if (availableSeats !== undefined && (isNaN(requestedAvailableSeats) || requestedAvailableSeats < 0)) {
             return res.status(400).json({
                 message: "Available seats must be a non-negative number"
+            });
+        }
+
+        // Do not let an update reduce the ride's remaining seat inventory
+        // below the number of passengers already recorded on the ride. This
+        // protects existing passengers from being made impossible by a later
+        // capacity edit.
+        const passengerCount = ride.passengers?.length ?? 0;
+        if (requestedAvailableSeats !== undefined && requestedAvailableSeats < passengerCount) {
+            return res.status(400).json({
+                message: "Available seats cannot be less than the current passenger count"
             });
         }
 
@@ -305,7 +351,7 @@ const updateRideController = async (req, res) => {
         }
 
         if (availableSeats !== undefined) {
-            ride.availableSeats = Number(availableSeats);
+            ride.availableSeats = requestedAvailableSeats;
         }
 
         if (price !== undefined) {
@@ -328,52 +374,72 @@ const updateRideController = async (req, res) => {
 };
 
 const cancelRideController = async (req, res) => {
+    const { id } = req.params;
+
+    // Validate the identifier before opening a database session.
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+            message: "Invalid ride ID"
+        });
+    }
+
+    const session = await mongoose.startSession();
+
     try {
-        const { id } = req.params;
+        let cancelledRide;
+        let cancelledBookingCount = 0;
 
-        // Validate MongoDB ObjectId
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                message: "Invalid ride ID"
-            });
-        }
+        // Ride cancellation and booking cancellation must succeed or fail
+        // together, otherwise users can retain confirmed bookings for a ride
+        // that no longer exists as an active option.
+        await session.withTransaction(async () => {
+            const ride = await rideModel
+                .findById(id)
+                .session(session);
 
-        // Find the ride
-        const ride = await rideModel.findById(id);
+            if (!ride) {
+                throw createHttpError(404, "Ride not found");
+            }
 
-        if (!ride) {
-            return res.status(404).json({
-                message: "Ride not found"
-            });
-        }
+            if (ride.creator.toString() !== req.user._id.toString()) {
+                throw createHttpError(403, "You are not authorized to cancel this ride");
+            }
 
-        // Only the creator can cancel the ride
-        if (ride.creator.toString() !== req.user._id.toString()) {
-            return res.status(403).json({
-                message: "You are not authorized to cancel this ride"
-            });
-        }
+            if (ride.status !== "active") {
+                throw createHttpError(400, "Only active rides can be canceled");
+            }
 
-        // Only active rides can be canceled
-        if (ride.status !== "active") {
-            return res.status(400).json({
-                message: "Only active rides can be canceled"
-            });
-        }
+            ride.status = "cancelled";
+            await ride.save({ session });
 
-        // Update the ride status to cancelled
-        ride.status = "cancelled";
-        await ride.save();
+            // Cancel all confirmed bookings without changing the ride's seat
+            // count, because a cancelled ride cannot be booked again.
+            const bookingUpdate = await bookingModel.updateMany(
+                {
+                    ride: ride._id,
+                    status: "confirmed"
+                },
+                {
+                    $set: { status: "cancelled" }
+                },
+                { session }
+            );
+
+            cancelledRide = ride;
+            cancelledBookingCount = bookingUpdate.modifiedCount;
+        });
 
         return res.status(200).json({
             message: "Ride canceled successfully",
-            ride
+            ride: cancelledRide,
+            cancelledBookingCount
         });
-
     } catch (error) {
-        return res.status(500).json({
+        return res.status(error.statusCode || 500).json({
             message: error.message
         });
+    } finally {
+        await session.endSession();
     }
 };
 

@@ -140,7 +140,7 @@ async function registerController(req, res) {
 
 
         const token = jwt.sign(
-            { userId: user._id },
+            { userId: user._id, tokenVersion: user.tokenVersion ?? 0 },
             process.env.JWT_SECRET,
             { expiresIn: "2d" }
         );
@@ -191,9 +191,18 @@ async function loginController(req, res) {
                 message: "Username or password is INVALID"
             })
         }
+
+        // Do not issue a new token to a blacklisted user. The auth middleware
+        // also protects existing tokens, but login must reject them too.
+        if (user.isBlacklisted) {
+            return res.status(403).json({
+                message: "User is blacklisted"
+            });
+        }
+
         // If email and password are valid then generate a JWT token and send it in response.
         const token = jwt.sign(
-            { userId: user._id },
+            { userId: user._id, tokenVersion: user.tokenVersion ?? 0 },
             process.env.JWT_SECRET,
             { expiresIn: "2d" }
         );
@@ -219,18 +228,47 @@ async function loginController(req, res) {
  * - POST /api/auth/logout
   */
 async function logoutController(req, res) {
-    // Check if user is logged in by retrieving token
-    const token = req.cookies.token || req.headers.authorization?.split(" ")[1]
-    // if user token doesn't exist - logout
-    if (!token) {
-        return res.status(200).json({
-            message: "User logged out successfully"
-        })
-    }
+    // Always clear the cookie, even when the client has no valid token. This
+    // keeps logout idempotent and removes stale browser credentials.
     res.clearCookie("token", cookieOptions);
+
+    const cookieToken = req.cookies?.token;
+    const authorization = req.headers.authorization;
+    const bearerToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+    const token = cookieToken || bearerToken;
+
+    if (token) {
+        let decoded;
+
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            // Logout should still succeed for expired or malformed tokens;
+            // there is nothing valid left to revoke in that case.
+        }
+
+        if (decoded?.userId) {
+            try {
+                // JWTs are otherwise stateless. Incrementing tokenVersion
+                // makes this token (and any other token issued before logout)
+                // invalid in auth.middleware.js, including bearer tokens.
+                await userModel.findByIdAndUpdate(
+                    decoded.userId,
+                    { $inc: { tokenVersion: 1 } }
+                );
+            } catch (error) {
+                // Do not report a successful logout when the database could
+                // not persist the revocation; the token would remain usable.
+                return res.status(500).json({
+                    message: "Unable to revoke session"
+                });
+            }
+        }
+    }
+
     return res.status(200).json({
         message: "User logged out successfully"
-    })
+    });
 
 }
 

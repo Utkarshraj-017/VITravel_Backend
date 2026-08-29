@@ -15,6 +15,7 @@ const userSchema = new mongoose.Schema({
     password:{
         type: String,
         required:true,
+        select:false
     },
     email:{
         type: String,
@@ -30,6 +31,12 @@ const userSchema = new mongoose.Schema({
     isBlacklisted:{
         type : Boolean,
         default : false,
+    },
+    // Incrementing this value invalidates all JWTs issued before the change.
+    // It lets logout revoke bearer tokens as well as the HTTP-only cookie.
+    tokenVersion: {
+        type: Number,
+        default: 0
     },
     reportCounter : {
         type : Number,

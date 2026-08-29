@@ -11,6 +11,18 @@ const otpLimiter = rateLimit({
     }
 });
 
+// Limit OTP verification attempts separately from OTP sending. Without this
+// limiter an attacker could make unlimited guesses against one OTP.
+const verifyOTPLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10,                   // Max 10 verification attempts per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        message: "Too many OTP verification attempts. Please try again later."
+    }
+});
+
 // Limit login attempts
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -24,5 +36,6 @@ const loginLimiter = rateLimit({
 
 module.exports = {
     otpLimiter,
+    verifyOTPLimiter,
     loginLimiter
 };

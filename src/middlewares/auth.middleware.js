@@ -23,6 +23,15 @@ async function authMiddleware(req, res, next) {
             });
         }
 
+        // Compare the token's version with the current user version so a
+        // logout can revoke stateless JWTs, including bearer tokens. Tokens
+        // created before this field existed are treated as version 0.
+        if ((decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0)) {
+            return res.status(401).json({
+                message: "Session has been revoked. Please login again."
+            });
+        }
+
         if (user.isBlacklisted) {
             return res.status(403).json({
                 message: "User is blacklisted"

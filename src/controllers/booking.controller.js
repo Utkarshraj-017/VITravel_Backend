@@ -242,6 +242,13 @@ const cancelBookingController = async (req, res) => {
                 throw createHttpError(404, "Associated ride not found");
             }
 
+            // A ride cancellation transaction changes its bookings to
+            // cancelled. This guard also prevents seat restoration if an old
+            // inconsistent booking is still marked confirmed.
+            if (ride.status !== "active") {
+                throw createHttpError(400, "Ride is no longer available");
+            }
+
             const rideDateTime = new Date(
                 `${ride.date.toISOString().split("T")[0]}T${ride.time}`
             );
@@ -274,7 +281,7 @@ const cancelBookingController = async (req, res) => {
             // Increment the seat and remove the passenger atomically within the
             // same transaction as the booking status change.
             const updatedRide = await rideModel.findOneAndUpdate(
-                { _id: booking.ride },
+                { _id: booking.ride, status: "active" },
                 {
                     $inc: { availableSeats: 1 },
                     $pull: { passengers: userId }

@@ -78,14 +78,14 @@ Create a `.env` file in the backend root.
 Example:
 
 ```env
-PORT=3000
+PORT=5000
 
-MONGO_URI=<your-mongodb-connection-string>
+MONGODB_URI=<your-mongodb-connection-string>
 
 JWT_SECRET=<your-jwt-secret>
 
 EMAIL_USER=<email-used-for-otp>
-EMAIL_PASS=<email-app-password>
+BREVO_API_KEY=<your-brevo-api-key>
 ```
 
 Never commit the real `.env` file to GitHub.
@@ -99,7 +99,7 @@ npm run dev
 The backend should now be available at:
 
 ```text
-http://localhost:3000
+http://localhost:5000
 ```
 
 ---
@@ -159,7 +159,7 @@ React Dashboard
 During local development:
 
 ```text
-http://localhost:3000
+http://localhost:5000
 ```
 
 A frontend project should preferably store this in an environment variable rather than hardcoding it.
@@ -167,7 +167,7 @@ A frontend project should preferably store this in an environment variable rathe
 For a Vite frontend:
 
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_URL=http://localhost:5000
 ```
 
 Then:
@@ -399,11 +399,7 @@ Example response:
 ```json
 {
   "message": "Login successful",
-  "user": {
-    "_id": "USER_ID",
-    "name": "Test User",
-    "username": "testuser"
-  }
+  "status": "success"
 }
 ```
 
@@ -434,7 +430,9 @@ After successful login, redirect the user to the dashboard.
 
 # 9. Logout
 
-The logout endpoint should clear/invalidate the authentication cookie.
+The logout endpoint clears the authentication cookie and invalidates the
+current JWT session, including bearer tokens sent in the `Authorization`
+header.
 
 ```http
 POST /api/auth/logout
@@ -554,11 +552,12 @@ Example body:
 
 ```json
 {
-  "source": "VIT Bhopal",
+  "from": "VIT Bhopal",
   "destination": "Bhopal Railway Station",
-  "date": "2026-08-01",
+  "date": "2027-08-01",
   "time": "10:30",
-  "availableSeats": 3
+  "availableSeats": 3,
+  "price": 100
 }
 ```
 
@@ -655,7 +654,7 @@ Frontend
 http://localhost:5173
 
 Backend
-http://localhost:3000
+http://localhost:5000
 ```
 
 The backend therefore needs CORS configuration that allows the frontend origin.
@@ -779,8 +778,8 @@ The backend remains responsible for authentication, authorization, validation, a
 ### Backend
 
 ```env
-PORT=
-MONGO_URI=
+PORT=5000
+MONGODB_URI=
 JWT_SECRET=
 EMAIL_USER=
 BREVO_API_KEY=
@@ -789,7 +788,7 @@ BREVO_API_KEY=
 ### Frontend
 
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_URL=http://localhost:5000
 ```
 
 Only values safe to expose publicly should use Vite frontend environment variables.
@@ -828,7 +827,7 @@ localhost:5173
    | HTTP / JSON
    v
 Express
-localhost:3000
+localhost:5000
    |
    v
 MongoDB Atlas
