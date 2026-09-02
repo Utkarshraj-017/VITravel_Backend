@@ -50,6 +50,9 @@ backend/
 │   ├── ride.routes.js
 │   └── ...
 │
+├── docs/
+│   └── chat-service-integration.md
+│
 ├── services/
 │   ├── otpAuth.service.js
 │   └── ...
@@ -59,6 +62,9 @@ backend/
 ├── .env
 └── package.json
 ```
+
+The planned chat microservice integration contract is documented in
+[`docs/chat-service-integration.md`](docs/chat-service-integration.md).
 
 ---
 

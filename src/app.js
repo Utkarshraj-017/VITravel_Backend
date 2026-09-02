@@ -6,7 +6,7 @@ const cookieParser = require("cookie-parser");
 
 const app = express();
 
-const frontendOrigin = "http://localhost:3000" || process.env.FRONTEND_URL ; 
+const frontendOrigin =  process.env.FRONTEND_URL || "http://localhost:3000"; 
 
 app.use(cors({
     origin: frontendOrigin,
