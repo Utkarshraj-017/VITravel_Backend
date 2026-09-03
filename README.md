@@ -1,341 +1,218 @@
 # VITravels Backend
 
-Backend API for **VITravels**, a ride-sharing platform designed for VIT Bhopal students to create rides, find available rides, join rides, and manage their journeys.
+Backend API for VITravels, a ride-sharing application for VIT Bhopal
+students. This service owns users, authentication, rides, bookings, ride
+membership, and the integration contract used by the separate OueChat
+microservice.
 
-This README is primarily intended to help frontend developers understand and integrate with the backend API.
-
-Note: AI tools were used for documentation, debugging, and troubleshooting assistance during the development & deployement process. However, AI tools were not used during the initial development or core implementation of the project.
-
----
-
-## Chat integration flow
-
-The chat UI may be part of the ride frontend, while OueChat runs as a
-separate chat microservice. The integration works in this order:
+Live API:
 
 ```text
-1. Frontend → Ride backend
-   POST /api/chat/rides/:rideId/session
-   Authorization: Bearer <ride-app-token>
-
-2. Ride backend
-   - Verifies the logged-in user
-   - Checks the user's ride membership
-   - Creates a short-lived chatToken
-
-3. Frontend → OueChat
-   - Opens a Socket.IO connection using chatToken
-
-4. OueChat
-   - Verifies the chatToken signature using CHAT_TOKEN_SECRET
-   - Checks token expiry, audience, user ID, and ride ID
-   - Calls the ride backend internally:
-     POST /api/chat/membership/validate
-
-5. Ride backend
-   - Validates the current membership, ride status, and blacklist status
-   - Returns allowed: true or allowed: false
-
-6. OueChat
-   - Allows the user to join the ride room only when allowed is true
-   - Revalidates membership before loading or sending messages
+https://vitravel-backend.onrender.com
 ```
 
-The frontend must never call the internal membership endpoint directly. It
-only requests a chat session from the ride backend and uses the returned
-chatToken to connect to OueChat.
+## What this service provides
 
----
+- Email OTP verification and user registration
+- JWT authentication using an HTTP-only cookie or a bearer token
+- User profile management and public profile lookup for authenticated users
+- Ride creation, search, update, cancellation, and lifecycle completion
+- Atomic booking creation and cancellation with seat updates
+- Chat-session token creation for the separate OueChat service
+- Internal membership validation for OueChat
 
-## Tech Stack
+The frontend must never connect directly to MongoDB. It communicates with
+this API over HTTP and JSON.
 
-* Node.js
-* Express.js
-* MongoDB
-* Mongoose
-* JWT Authentication
-* bcrypt
-* Cookie-based authentication
-* Brevo API for email OTP verification
+## Technology and runtime requirements
 
----
+- Node.js `20.19.0` or newer
+- Express `5`
+- MongoDB and Mongoose `9`
+- JSON Web Tokens (`jsonwebtoken`)
+- `bcrypt` for password hashing
+- Brevo REST API for email OTP delivery
+- `express-rate-limit` for OTP and login limits
 
-# 1. Project Structure
+MongoDB must support replica-set transactions. MongoDB Atlas supports this by
+default. A local MongoDB deployment must be configured as a replica set for
+booking and cancellation transactions to work.
+
+## Project structure
 
 ```text
-backend/
-│
-├── config/
-│   ├── db.config.js
-│   └── mail.config.js
-│
-├── controllers/
-│   ├── auth.controller.js
-│   ├── ride.controller.js
-│   └── ...
-│
-├── middleware/
-│   ├── auth.middleware.js
-│   └── ...
-│
-├── models/
-│   ├── user.model.js
-│   ├── ride.model.js
-│   ├── emailVerification.model.js
-│   └── ...
-│
-├── routes/
-│   ├── auth.routes.js
-│   ├── ride.routes.js
-│   └── ...
-│
-├── services/
-│   ├── otpAuth.service.js
-│   └── ...
-│
-├── app.js
+VITravel_Backend/
+├── src/
+│   ├── app.js
+│   ├── config/
+│   │   ├── db.js
+│   │   └── mail.config.js
+│   ├── controllers/
+│   │   ├── auth.controller.js
+│   │   ├── booking.controller.js
+│   │   ├── chat.controller.js
+│   │   ├── ride.controller.js
+│   │   └── user.controller.js
+│   ├── middlewares/
+│   │   ├── auth.middleware.js
+│   │   ├── chatServiceAuth.middleware.js
+│   │   ├── error.middleware.js
+│   │   └── rateLimiter.middleware.js
+│   ├── models/
+│   │   ├── booking.model.js
+│   │   ├── emailVerification.model.js
+│   │   ├── ride.model.js
+│   │   └── user.model.js
+│   ├── routes/
+│   │   ├── auth.routes.js
+│   │   ├── booking.routes.js
+│   │   ├── chat.routes.js
+│   │   ├── ride.routes.js
+│   │   └── user.routes.js
+│   └── services/
+│       ├── chatMembership.service.js
+│       ├── otpAuth.service.js
+│       └── rideStatus.service.js
 ├── server.js
-├── .env
-└── package.json
+├── package.json
+└── README.md
 ```
 
----
+`server.js` loads environment variables, connects to MongoDB, starts the
+expired-ride completion service, and starts Express. `src/app.js` configures
+middleware and mounts the API route groups.
 
-# 2. Running the Backend Locally
+## Configuration
 
-Clone the repository and install dependencies:
-
-```bash
-git clone <repository-url>
-cd <backend-folder>
-
-npm install
-```
-
-Create a `.env` file in the backend root.
-
-Example:
+Create a `.env` file in the repository root. Do not commit it.
 
 ```env
+NODE_ENV=development
 PORT=5000
+MONGODB_URI=<mongodb-connection-string>
+JWT_SECRET=<long-random-jwt-secret>
+EMAIL_USER=<sender-email-address>
+BREVO_API_KEY=<brevo-api-key>
+FRONTEND_URL=http://localhost:5173
 
-MONGODB_URI=<your-mongodb-connection-string>
-
-JWT_SECRET=<your-jwt-secret>
-
-EMAIL_USER=<email-used-for-otp>
-BREVO_API_KEY=<your-brevo-api-key>
-
-CHAT_TOKEN_SECRET=<secret-shared-with-ouechat-for-chat-tokens>
-CHAT_SERVICE_SECRET=<secret-shared-with-ouechat-for-membership-validation>
+# These two values must match the corresponding values in OueChat.
+CHAT_TOKEN_SECRET=<shared-chat-token-secret>
+CHAT_SERVICE_SECRET=<shared-chat-service-secret>
 ```
 
-Never commit the real `.env` file to GitHub.
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `NODE_ENV` | No | Uses production cookie/CORS behavior when set to `production`. |
+| `PORT` | No | Express port. Defaults to `5000`. |
+| `MONGODB_URI` | Yes | MongoDB connection string for ride application data. |
+| `JWT_SECRET` | Yes | Signs and verifies ride-application JWTs. |
+| `EMAIL_USER` | Yes for OTP | Sender address used by Brevo. |
+| `BREVO_API_KEY` | Yes for OTP | Brevo API credential used to send OTP emails. |
+| `FRONTEND_URL` | Production | Exact frontend origin allowed by CORS in production. |
+| `CHAT_TOKEN_SECRET` | Chat integration | Shared with OueChat to sign and verify chat tokens. |
+| `CHAT_SERVICE_SECRET` | Chat integration | Shared with OueChat for internal membership requests. |
 
-Start the development server:
+`FRONTEND_URL` is one origin, including scheme, host, and port. During
+development, `http://localhost:3000` and `http://localhost:5173` are allowed
+in addition to the configured origin. Credentialed requests are enabled.
 
-```bash
+## Install and run
+
+```powershell
+npm install
 npm run dev
 ```
 
-The backend should now be available at:
+For production-style startup:
+
+```powershell
+npm start
+```
+
+The current scripts are:
+
+```json
+{
+  "start": "node server.js",
+  "dev": "nodemon server.js"
+}
+```
+
+The server connects to MongoDB and starts the ride-status service before it
+begins accepting HTTP requests. If the database connection fails, startup
+exits.
+
+Basic availability check:
+
+```http
+GET /
+```
+
+Response:
 
 ```text
-http://localhost:5000
+VITravels Backend Running
 ```
 
----
+## Request and response conventions
 
-# 3. Frontend ↔ Backend Architecture
+- Send request bodies as JSON with `Content-Type: application/json`.
+- Cookie-authenticated frontend requests must use `credentials: "include"`.
+- The auth middleware also accepts `Authorization: Bearer <token>`.
+- Most error responses use the shape `{ "message": "..." }`.
+- Always check `response.ok` or the HTTP status before using response data.
+- IDs are MongoDB ObjectId strings.
 
-The frontend should **never communicate directly with MongoDB**.
-
-```text
-React Frontend
-      |
-      | HTTP Request
-      | JSON
-      v
-Express Backend
-      |
-      | Controllers / Services
-      v
-MongoDB
-      |
-      v
-Express Response
-      |
-      | JSON
-      v
-React Frontend
-```
-
-Example:
-
-```text
-React Login Form
-
-      |
-      | POST /api/auth/login
-      v
-
-Express Route
-      |
-      v
-Login Controller
-      |
-      v
-MongoDB
-      |
-      v
-JSON Response
-      |
-      v
-React Dashboard
-```
-
----
-
-# 4. API Base URL
-
-During local development:
-
-```text
-http://localhost:5000
-```
-
-A frontend project should preferably store this in an environment variable rather than hardcoding it.
-
-For a Vite frontend:
-
-```env
-VITE_API_URL=http://localhost:5000
-```
-
-Then:
+Example authenticated request:
 
 ```js
-const API_URL = import.meta.env.VITE_API_URL;
-```
-
-After deployment, replace this value with the deployed backend URL.
-
----
-
-# 5. Request Format
-
-Unless stated otherwise, requests containing data should use JSON.
-
-Example:
-
-```js
-fetch(`${API_URL}/api/auth/login`, {
-    method: "POST",
-
-    headers: {
-        "Content-Type": "application/json",
-    },
-
-    body: JSON.stringify({
-        username,
-        password,
-    }),
-
-    credentials: "include",
+const response = await fetch(`${API_URL}/api/rides`, {
+    credentials: "include"
 });
+
+const data = await response.json();
+
+if (!response.ok) {
+    throw new Error(data.message || "Request failed");
+}
 ```
 
-`credentials: "include"` is important when authentication uses HTTP-only cookies.
+Common statuses:
 
----
+| Status | Meaning |
+| --- | --- |
+| `200` | Successful request |
+| `201` | Resource created |
+| `400` | Invalid input or invalid state transition |
+| `401` | Missing, invalid, or revoked authentication |
+| `403` | Authenticated user is not allowed |
+| `404` | Resource not found |
+| `409` | Duplicate or conflicting request |
+| `429` | Rate limit exceeded |
+| `500` | Server or dependency failure |
 
-# 6. Authentication
+## Authentication API
 
-ViTravels uses JWT-based authentication.
+Authentication routes are mounted under `/api/auth`.
 
-After successful authentication, the backend stores the authentication token in an HTTP-only cookie.
-
-Because the cookie is HTTP-only, frontend JavaScript should **not attempt to read the token directly**.
-
-Instead, authenticated requests should include credentials:
-
-```js
-fetch(`${API_URL}/api/rides`, {
-    credentials: "include",
-});
-```
-
-The browser sends the authentication cookie automatically.
-
-Protected backend routes use authentication middleware to verify the JWT and identify the currently logged-in user.
-
-Conceptually:
-
-```text
-React
-   |
-   | request + cookie
-   v
-Auth Middleware
-   |
-   | verify JWT
-   v
-req.user
-   |
-   v
-Controller
-```
-
----
-
-# 7. Authentication Flow
-
-## Registration
-
-The expected registration flow is:
-
-```text
-Enter Email
-     |
-     v
-Send OTP
-     |
-     v
-Enter OTP
-     |
-     v
-Verify OTP
-     |
-     v
-Submit Registration Details
-     |
-     v
-Create User
-```
-
-Email verification happens before the user account is created.
-
----
-
-## Send OTP
-
-### Request
+### Send registration OTP
 
 ```http
 POST /api/auth/send-otp
 ```
 
-Example body:
+Request body:
 
 ```json
 {
-  "email": "student@vitbhopal.ac.in"
+  "email": "student@example.com"
 }
 ```
 
-### Success Response
+The email is normalized to lowercase. The current implementation does not
+enforce a VIT email domain. Existing registered emails are rejected.
 
-Example:
+Success: `200`
 
 ```json
 {
@@ -343,32 +220,25 @@ Example:
 }
 ```
 
-The OTP expires after a limited period.
+The OTP is six digits, expires after five minutes, and is stored hashed. This
+route is limited to 10 requests per IP per 15 minutes.
 
-The frontend should show an OTP input screen after this request succeeds.
-
----
-
-## Verify OTP
-
-### Request
+### Verify registration OTP
 
 ```http
 POST /api/auth/verify-otp
 ```
 
-Example body:
+Request body:
 
 ```json
 {
-  "email": "student@vitbhopal.ac.in",
+  "email": "student@example.com",
   "otp": "123456"
 }
 ```
 
-### Success Response
-
-Example:
+Success: `200`
 
 ```json
 {
@@ -376,54 +246,45 @@ Example:
 }
 ```
 
-After successful verification, the frontend can continue with account registration.
+Verification attempts are limited to 10 per IP per 15 minutes.
 
----
-
-## Register User
-
-### Request
+### Register
 
 ```http
 POST /api/auth/register
 ```
 
-Example body:
+Request body:
 
 ```json
 {
   "name": "Test User",
   "username": "testuser",
-  "email": "student@vitbhopal.ac.in",
+  "email": "student@example.com",
   "password": "password123"
 }
 ```
 
-The exact fields should match the current backend User model.
+The email must have been verified first. The password is hashed by the
+backend. On success, the backend creates the user and sets the authentication
+cookie.
 
-### Success Response
-
-Example:
+Success: `201`
 
 ```json
 {
-  "message": "User registered successfully"
+  "message": "User registered successfully",
+  "status": "success"
 }
 ```
 
-Passwords are hashed by the backend. The frontend must send the normal password over HTTPS and should never hash or store passwords itself.
-
----
-
-# 8. Login
-
-### Request
+### Login
 
 ```http
 POST /api/auth/login
 ```
 
-Example body:
+Request body:
 
 ```json
 {
@@ -432,11 +293,7 @@ Example body:
 }
 ```
 
-### Success
-
-The backend authenticates the credentials and sets the JWT authentication cookie.
-
-Example response:
+Success: `200`
 
 ```json
 {
@@ -445,152 +302,54 @@ Example response:
 }
 ```
 
-Frontend:
+The token is set in the HTTP-only `token` cookie and is not returned in the
+JSON response. Blacklisted users cannot log in. Login is limited to 10
+requests per IP per 15 minutes.
 
-```js
-const response = await fetch(`${API_URL}/api/auth/login`, {
-    method: "POST",
-
-    headers: {
-        "Content-Type": "application/json",
-    },
-
-    credentials: "include",
-
-    body: JSON.stringify({
-        username,
-        password,
-    }),
-});
-
-const data = await response.json();
-```
-
-After successful login, redirect the user to the dashboard.
-
----
-
-# 9. Logout
-
-The logout endpoint clears the authentication cookie and invalidates the
-current JWT session, including bearer tokens sent in the `Authorization`
-header.
+### Logout
 
 ```http
 POST /api/auth/logout
 ```
 
-Frontend example:
+This route clears the `token` cookie. When a valid cookie or bearer token is
+available, it increments the user's `tokenVersion`, revoking previously
+issued tokens. Logout is intentionally safe for missing, expired, or
+malformed tokens.
 
-```js
-await fetch(`${API_URL}/api/auth/logout`, {
-    method: "POST",
-    credentials: "include",
-});
-```
+Success: `200`
 
-After logout, redirect the user to the login page.
-
----
-
-# 10. Authentication Errors
-
-Frontend code should always check `response.ok` or the HTTP status code.
-
-Example:
-
-```js
-const response = await fetch(url, options);
-const data = await response.json();
-
-if (!response.ok) {
-    throw new Error(data.message || "Something went wrong");
+```json
+{
+  "message": "User logged out successfully"
 }
 ```
 
-Common HTTP status codes:
+## User API
 
-| Status | Meaning                                       |
-| ------ | --------------------------------------------- |
-| `200`  | Request successful                            |
-| `201`  | Resource created                              |
-| `400`  | Invalid request                               |
-| `401`  | Authentication required / invalid credentials |
-| `403`  | User does not have permission                 |
-| `404`  | Resource not found                            |
-| `409`  | Resource already exists                       |
-| `429`  | Too many requests                             |
-| `500`  | Internal server error                         |
+User routes are mounted under `/api/user` and require authentication.
 
-The frontend should display the backend's `message` field when appropriate.
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/user/me` | None | `{ "user": ... }` |
+| `PATCH` | `/api/user/me` | `{ "name": "New Name" }` | `{ "message": ..., "user": ... }` |
+| `GET` | `/api/user/:id` | None | `{ "user": { "name", "username" } }` |
 
----
+`PATCH /api/user/me` updates only the name. The user ID profile route is
+authenticated even though it returns public fields. Passwords are excluded
+from normal user queries by the model and are never returned by these routes.
 
-# 11. Ride APIs
+## Ride API
 
-The ride APIs are responsible for creating and retrieving available journeys.
+Ride routes are mounted under `/api/rides` and require authentication.
 
-Typical frontend flow:
-
-```text
-Dashboard
-   |
-   | GET rides
-   v
-Available Rides
-
-Create Ride Page
-   |
-   | POST ride
-   v
-Backend
-   |
-   v
-MongoDB
-```
-
----
-
-## Get Available Rides
-
-```http
-GET /api/rides
-```
-
-This endpoint is used by the frontend dashboard to retrieve rides.
-
-Example:
-
-```js
-const response = await fetch(`${API_URL}/api/rides`, {
-    credentials: "include",
-});
-
-const rides = await response.json();
-```
-
-The returned rides can then be rendered using React components such as:
-
-```text
-Dashboard
-   |
-   ├── RideCard
-   ├── RideCard
-   ├── RideCard
-   └── RideCard
-```
-
----
-
-## Create Ride
+### Create a ride
 
 ```http
 POST /api/rides/ride
 ```
 
-This is a protected route.
-
-Example body:
+Request body:
 
 ```json
 {
@@ -603,324 +362,353 @@ Example body:
 }
 ```
 
-Frontend request:
+All fields are required. `availableSeats` and `price` must be greater than
+zero at creation. Source and destination cannot be the same. The combined
+date and time must be in the future.
 
-```js
-await fetch(`${API_URL}/api/rides/ride`, {
-    method: "POST",
+Success: `201` with the created ride document.
 
-    headers: {
-        "Content-Type": "application/json",
-    },
+### Search active rides
 
-    credentials: "include",
-
-    body: JSON.stringify(rideData),
-});
+```http
+GET /api/rides
 ```
 
-The backend should determine the ride creator from the authenticated user rather than trusting a user ID supplied by the frontend.
-
----
-
-# 12. Recommended Frontend API Structure
-
-Instead of putting `fetch()` everywhere inside React components, create a dedicated API layer.
-
-Recommended structure:
+Optional query parameters:
 
 ```text
-src/
-│
-├── api/
-│   ├── auth.api.js
-│   ├── rides.api.js
-│   └── bookings.api.js
-│
-├── components/
-├── pages/
-└── App.jsx
+from=<text>
+destination=<text>
+date=YYYY-MM-DD
+availableSeats=<minimum>
+minPrice=<minimum>
+maxPrice=<maximum>
 ```
 
-Example `auth.api.js`:
+The endpoint returns only active rides with more than zero available seats.
+Expired rides are also filtered out using their `date` and `time` fields.
 
-```js
-const API_URL = import.meta.env.VITE_API_URL;
+Success: `200`
 
-export async function login(username, password) {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-
-        headers: {
-            "Content-Type": "application/json",
-        },
-
-        credentials: "include",
-
-        body: JSON.stringify({
-            username,
-            password,
-        }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+```json
+{
+  "count": 1,
+  "rides": [
+    {
+      "_id": "...",
+      "creator": {
+        "_id": "...",
+        "name": "Test User",
+        "username": "testuser"
+      },
+      "from": "VIT Bhopal",
+      "destination": "Bhopal Railway Station",
+      "date": "2027-08-01T00:00:00.000Z",
+      "time": "10:30",
+      "availableSeats": 3,
+      "status": "active",
+      "price": 100,
+      "passengers": []
     }
-
-    return data;
+  ]
 }
 ```
 
-Then the React login page only needs:
+### Get the current user's rides
 
-```js
-import { login } from "../api/auth.api";
-
-const data = await login(username, password);
+```http
+GET /api/rides/my-rides
 ```
 
-This keeps frontend components separate from API logic.
+Success: `200` with `{ "count": number, "rides": [] }`.
 
----
+### Get a ride by ID
 
-# 13. CORS
-
-During development, React and Express usually run on different origins.
-
-For example:
-
-```text
-Frontend
-http://localhost:5173
-
-Backend
-http://localhost:5000
+```http
+GET /api/rides/rides/:id
 ```
 
-The backend therefore needs CORS configuration that allows the frontend origin.
+Success: `200` with the ride document. `creator` and `passengers` are
+populated with `name` and `username`.
 
-When using cookies, both the frontend and backend must also enable credentials.
+### Update a ride
 
-Frontend:
-
-```js
-credentials: "include"
+```http
+PATCH /api/rides/rides/:id
 ```
 
-Backend CORS configuration should allow credentials for the trusted frontend origin.
+The creator may update any supplied field:
 
-Do not use unrestricted origins with credentialed requests in production.
-
----
-
-# 14. Recommended Frontend Pages
-
-A React frontend can initially be structured around:
-
-```text
-src/pages/
-
-Login.jsx
-Register.jsx
-VerifyEmail.jsx
-Dashboard.jsx
-CreateRide.jsx
-RideDetails.jsx
-MyRides.jsx
-MyBookings.jsx
+```json
+{
+  "from": "VIT Bhopal",
+  "destination": "Airport",
+  "date": "2027-08-02",
+  "time": "11:00",
+  "availableSeats": 4,
+  "price": 120
+}
 ```
 
-Reusable UI should live inside:
+Only active rides can be updated. A new date/time must be in the future,
+price must be greater than zero, and available seats cannot be reduced below
+the number of existing passengers.
 
-```text
-src/components/
+Success: `200`
 
-Navbar.jsx
-RideCard.jsx
-RideForm.jsx
-LoadingSpinner.jsx
-ProtectedRoute.jsx
+```json
+{
+  "message": "Ride updated successfully",
+  "ride": { }
+}
 ```
 
----
+### Cancel a ride
 
-# 15. Suggested React Routes
-
-A frontend implementation could use:
-
-```text
-/                     Landing page
-
-/login                Login
-/register             Registration
-/verify-email         OTP verification
-
-/dashboard            Available rides
-
-/rides/create         Create ride
-/rides/:id            Ride details
-/my-rides             User-created rides
-
-/bookings             User bookings
+```http
+PATCH /api/rides/rides/:id/cancel
 ```
 
-Protected pages should only be accessible after authentication.
+Only the creator can cancel an active ride. The ride and all confirmed
+bookings are updated in one MongoDB transaction.
 
----
+Success: `200`
 
-# 16. Frontend Integration Flow
-
-A frontend developer implementing ViTravels should roughly follow:
-
-```text
-1. Configure API base URL
-            ↓
-2. Implement Register
-            ↓
-3. Implement OTP Verification
-            ↓
-4. Implement Login
-            ↓
-5. Handle Authentication
-            ↓
-6. Build Dashboard
-            ↓
-7. Fetch Available Rides
-            ↓
-8. Implement Create Ride
-            ↓
-9. Implement Ride Details
-            ↓
-10. Implement Booking / Joining
+```json
+{
+  "message": "Ride canceled successfully",
+  "ride": { "status": "cancelled" },
+  "cancelledBookingCount": 1
+}
 ```
 
----
+Cancelled rides cannot be booked again.
 
-# 17. Important Frontend Rules
+### Ride and booking statuses
 
-The frontend should never:
+Ride status values are `active`, `completed`, and `cancelled`.
 
-* Connect directly to MongoDB.
-* Store user passwords.
-* Store backend secrets.
-* Put `JWT_SECRET`, database credentials, or email credentials in frontend environment variables.
-* Trust frontend-side validation as security.
-* Attempt to manually access HTTP-only authentication cookies.
+Booking status values are `confirmed`, `completed`, and `cancelled`.
 
-Frontend validation exists mainly for user experience.
+The ride-status service runs immediately at startup and then every 60 seconds.
+It marks expired active rides as `completed` and their confirmed bookings as
+`completed`. The service rechecks the original date/time and active status in
+its update, so a rescheduled ride is not incorrectly completed.
 
-The backend remains responsible for authentication, authorization, validation, and security.
+## Booking API
 
----
+Booking routes are mounted under `/api/bookings` and require authentication.
 
-# 18. Environment Variables
+### Create or rebook a ride
 
-### Backend
-
-```env
-PORT=5000
-MONGODB_URI=
-JWT_SECRET=
-EMAIL_USER=
-BREVO_API_KEY=
-CHAT_TOKEN_SECRET=
-CHAT_SERVICE_SECRET=
+```http
+POST /api/bookings/create
 ```
 
-### Frontend
+Request body:
+
+```json
+{
+  "rideId": "665abc123456789012345678"
+}
+```
+
+The request is rejected when the ride is missing, inactive, expired, full, or
+owned by the requesting user. A user cannot have two bookings for the same
+ride. If the existing booking is cancelled, it is reactivated instead of
+creating a duplicate document.
+
+Booking creation, seat decrement, and passenger insertion run in one
+transaction. The seat update is conditional on `availableSeats > 0`, so
+concurrent requests cannot reserve the same final seat.
+
+Success: `201`
+
+```json
+{
+  "message": "Ride booked successfully",
+  "booking": { }
+}
+```
+
+### Get the current user's bookings
+
+```http
+GET /api/bookings/my-bookings
+```
+
+Success: `200` with `{ "bookings": [] }`. Each ride is populated and its
+creator includes `name` and `username`.
+
+### Get a booking by ID
+
+```http
+GET /api/bookings/:id
+```
+
+Users can access only their own booking. The ride and its creator are
+populated in the response.
+
+### Cancel a booking
+
+```http
+PATCH /api/bookings/:id/cancel
+```
+
+Only the booking owner can cancel a confirmed booking. The booking status is
+changed to `cancelled`, one seat is restored, and the user is removed from the
+ride's passenger list in one transaction. Cancellation is rejected for an
+inactive or already-started ride.
+
+Success: `200`
+
+```json
+{
+  "message": "Booking cancelled successfully",
+  "booking": { "status": "cancelled" }
+}
+```
+
+## OueChat integration
+
+OueChat is a separate chat microservice with its own server and MongoDB. The
+ride backend does not create chat messages or access the chat database. It
+only authenticates users, verifies ride membership, and issues chat tokens.
+
+### Create a chat session
+
+```http
+POST /api/chat/rides/:rideId/session
+Authorization: Bearer <ride-app-jwt>
+```
+
+The normal ride authentication middleware verifies the user, blacklist state,
+and token version. The chat membership service then allows only the ride
+creator or a user with a confirmed booking while the ride is active and in the
+future.
+
+Success: `200`
+
+```json
+{
+  "roomId": "ride:665abc123456789012345678",
+  "rideId": "665abc123456789012345678",
+  "userId": "665def123456789012345678",
+  "role": "creator",
+  "chatToken": "<short-lived-jwt>",
+  "expiresAt": "2027-08-01T05:35:00.000Z"
+}
+```
+
+The chat token expires after five minutes and contains `sub`, `rideId`, and
+`role`. It is signed with `CHAT_TOKEN_SECRET` and uses the audience
+`ouechat`.
+
+The frontend uses `chatToken` to connect to OueChat through Socket.IO. The
+frontend must not call the membership endpoint below directly.
+
+### Internal membership validation
+
+OueChat calls this ride-backend endpoint before allowing a user to join, load
+messages, or send a message:
+
+```http
+POST /api/chat/membership/validate
+Content-Type: application/json
+x-chat-service-secret: <CHAT_SERVICE_SECRET>
+```
+
+Request body:
+
+```json
+{
+  "rideId": "665abc123456789012345678",
+  "userId": "665def123456789012345678"
+}
+```
+
+Response:
+
+```json
+{
+  "allowed": true,
+  "role": "passenger",
+  "rideStatus": "active",
+  "bookingStatus": "confirmed"
+}
+```
+
+This endpoint is protected by `CHAT_SERVICE_SECRET` and is intended only for
+server-to-server communication. The two chat secrets must match between this
+backend and OueChat.
+
+For the complete OueChat Socket.IO contract and deployment instructions, see
+the OueChat repository's `server/README.md`.
+
+## Authentication and security rules
+
+- The authentication cookie is named `token`, is HTTP-only, and lasts two
+  days.
+- Production cookies use `secure: true` and `SameSite=None`; development uses
+  `secure: false` and `SameSite=Lax`.
+- Logout increments `tokenVersion` so existing cookie and bearer tokens can be
+  revoked.
+- Blacklisted users are rejected by authentication and cannot issue chat
+  sessions.
+- Passwords are stored hashed and excluded from normal user queries with
+  `select: false`.
+- Never put `JWT_SECRET`, `MONGODB_URI`, Brevo credentials, or chat secrets in
+  frontend `VITE_*` variables.
+- CORS and frontend button visibility are not authorization. Backend
+  middleware and services perform the actual checks.
+- Use HTTPS in production.
+
+## Frontend integration
+
+The frontend is a separate project. Configure its API base URL using an
+environment variable:
 
 ```env
 VITE_API_URL=http://localhost:5000
 ```
 
-Only values safe to expose publicly should use Vite frontend environment variables.
+For cookie authentication, use:
 
-Never put backend secrets inside `VITE_*` variables.
-
----
-
-# 19. Development Setup
-
-Run the backend:
-
-```bash
-cd backend
-npm install
-npm run dev
+```js
+fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    credentials: "include",
+    body: JSON.stringify({ username, password })
+});
 ```
 
-Run the React frontend separately:
+For the chat feature, first call the chat-session endpoint on this backend,
+then pass the returned token to the separate OueChat server. Do not place the
+chat token in a URL or persist it longer than needed.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## Deployment checklist
 
-Typical local architecture:
+1. Set all required environment variables in the deployment platform.
+2. Use a MongoDB deployment that supports transactions.
+3. Set `NODE_ENV=production`.
+4. Set `FRONTEND_URL` to the exact deployed frontend origin.
+5. Expose the deployed API base URL to the frontend as `VITE_API_URL`.
+6. Configure matching `CHAT_TOKEN_SECRET` and `CHAT_SERVICE_SECRET` in both
+   this backend and OueChat.
+7. Configure OueChat's `RIDE_BACKEND_URL` to this backend's base URL.
+8. Verify `GET /` and the authenticated API routes after deployment.
 
-```text
-Browser
-   |
-   v
-React
-localhost:5173
-   |
-   | HTTP / JSON
-   v
-Express
-localhost:5000
-   |
-   v
-MongoDB Atlas
-```
+## Current limitations and implementation notes
 
----
-
-# 20. API Documentation Checklist
-
-Before implementing a frontend feature, verify:
-
-```text
-Endpoint
-HTTP method
-Authentication required?
-Request body
-Query parameters
-Success response
-Error responses
-```
-
-For example:
-
-```text
-POST /api/auth/login
-
-Auth: No
-
-Body:
-{
-    username,
-    password
-}
-
-Success:
-200
-
-Errors:
-400 - Missing data
-401 - Invalid credentials
-500 - Server error
-```
-
-Keeping every backend endpoint documented in this format makes frontend integration significantly easier.
-
----
-
-# VITravels
-
-Built as a student ride-sharing platform for VIT Bhopal.
-
-The backend provides authentication, user management, ride management, booking/joining functionality, and the APIs required by the frontend application.
+- The API has no global error handler mounted; route controllers return their
+  own `{ message }` error responses.
+- Ride date and time are stored in separate fields. The combined value is
+  parsed using the server's local time zone.
+- The current ride routes use `/api/rides/ride` for creation and
+  `/api/rides/rides/:id` for detail, update, and cancellation. Frontend code
+  must use these exact paths.
+- There is no automated `test` script in `package.json`; the available scripts
+  are `dev` and `start`.
