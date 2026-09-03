@@ -50,9 +50,6 @@ backend/
 │   ├── ride.routes.js
 │   └── ...
 │
-├── docs/
-│   └── chat-service-integration.md
-│
 ├── services/
 │   ├── otpAuth.service.js
 │   └── ...
@@ -62,9 +59,6 @@ backend/
 ├── .env
 └── package.json
 ```
-
-The planned chat microservice integration contract is documented in
-[`docs/chat-service-integration.md`](docs/chat-service-integration.md).
 
 ---
 
@@ -92,6 +86,9 @@ JWT_SECRET=<your-jwt-secret>
 
 EMAIL_USER=<email-used-for-otp>
 BREVO_API_KEY=<your-brevo-api-key>
+
+CHAT_TOKEN_SECRET=<secret-shared-with-ouechat-for-chat-tokens>
+CHAT_SERVICE_SECRET=<secret-shared-with-ouechat-for-membership-validation>
 ```
 
 Never commit the real `.env` file to GitHub.
@@ -789,6 +786,8 @@ MONGODB_URI=
 JWT_SECRET=
 EMAIL_USER=
 BREVO_API_KEY=
+CHAT_TOKEN_SECRET=
+CHAT_SERVICE_SECRET=
 ```
 
 ### Frontend
