@@ -6,6 +6,12 @@ const cookieParser = require("cookie-parser");
 
 const app = express();
 
+// Render places one reverse proxy in front of this application and forwards
+// the original client IP in X-Forwarded-For. Trust exactly that one hop so
+// Express and express-rate-limit can identify clients correctly without
+// trusting an arbitrary proxy chain.
+app.set("trust proxy", 1);
+
 const localOrigins = [
     "http://localhost:3000",
     "http://localhost:5173"
