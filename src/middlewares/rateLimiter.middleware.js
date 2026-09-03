@@ -3,7 +3,7 @@ const rateLimit = require("express-rate-limit");
 // Limit OTP requests
 const otpLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10,                   // Max 10 requests
+    max: 50,                   // Max 50 requests
     standardHeaders: true,
     legacyHeaders: false,
     message: {
@@ -15,7 +15,7 @@ const otpLimiter = rateLimit({
 // limiter an attacker could make unlimited guesses against one OTP.
 const verifyOTPLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10,                   // Max 10 verification attempts per IP
+    max: 50,                   // Max 50 verification attempts per IP
     standardHeaders: true,
     legacyHeaders: false,
     message: {
@@ -26,7 +26,7 @@ const verifyOTPLimiter = rateLimit({
 // Limit login attempts
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: 50,
     standardHeaders: true,
     legacyHeaders: false,
     message: {
