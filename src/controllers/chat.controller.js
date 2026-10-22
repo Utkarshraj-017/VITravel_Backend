@@ -6,9 +6,17 @@ const {
 
 const CHAT_TOKEN_TTL_SECONDS = 5 * 60;
 
-const issueChatToken = (userId) => {
+const issueChatToken = (userId, senderName) => {
     if (!process.env.CHAT_TOKEN_SECRET) {
         throw new Error("Chat service is not configured");
+    }
+
+    const normalizedSenderName = typeof senderName === "string"
+        ? senderName.trim()
+        : "";
+
+    if (!normalizedSenderName) {
+        throw new Error("User name is required to create a chat session");
     }
 
     const issuedAt = Math.floor(Date.now() / 1000);
@@ -16,6 +24,7 @@ const issueChatToken = (userId) => {
     const chatToken = jwt.sign(
         {
             sub: userId,
+            name: normalizedSenderName,
             scope: "chat",
             iat: issuedAt,
             exp: expiresAt
@@ -33,11 +42,12 @@ const issueChatToken = (userId) => {
 };
 
 // Browser-facing session endpoint. The token identifies the authenticated
-// user only; OueChat performs ride membership checks per operation.
+// user and carries the trusted display name used by OueChat messages. OueChat
+// performs ride membership checks per operation.
 const createUserChatSessionController = async (req, res) => {
     try {
         const userId = req.user._id.toString();
-        const session = issueChatToken(userId);
+        const session = issueChatToken(userId, req.user.name);
 
         return res.status(200).json({
             userId,
@@ -77,7 +87,7 @@ const createChatSessionController = async (req, res) => {
         }
 
         const userId = req.user._id.toString();
-        const session = issueChatToken(userId);
+        const session = issueChatToken(userId, req.user.name);
 
         return res.status(200).json({
             roomId: `ride:${rideId}`,

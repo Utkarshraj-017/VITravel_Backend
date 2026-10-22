@@ -28,7 +28,7 @@ test("creates a user-scoped five-minute chat token", async () => {
     const response = createResponse();
 
     await createUserChatSessionController(
-        { user: { _id: "user-1" } },
+        { user: { _id: "user-1", name: "Alex User" } },
         response
     );
 
@@ -42,6 +42,7 @@ test("creates a user-scoped five-minute chat token", async () => {
     );
 
     assert.equal(payload.sub, "user-1");
+    assert.equal(payload.name, "Alex User");
     assert.equal(payload.aud, "ouechat");
     assert.equal(payload.scope, "chat");
     assert.equal(typeof payload.iat, "number");

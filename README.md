@@ -685,6 +685,7 @@ The chat token expires after five minutes and contains the following claims:
 ```json
 {
   "sub": "<userId>",
+  "name": "<sender display name>",
   "aud": "ouechat",
   "scope": "chat",
   "iat": "<issued timestamp>",
@@ -692,8 +693,9 @@ The chat token expires after five minutes and contains the following claims:
 }
 ```
 
-It is signed with `CHAT_TOKEN_SECRET`. Never expose `CHAT_TOKEN_SECRET` to the
-frontend or place it in a `VITE_*` variable.
+It is signed with `CHAT_TOKEN_SECRET`. The `name` claim is the trusted sender
+display name that OueChat includes with each chat message. Never expose
+`CHAT_TOKEN_SECRET` to the frontend or place it in a `VITE_*` variable.
 
 The previous endpoint remains available temporarily for compatibility:
 
