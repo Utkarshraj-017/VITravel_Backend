@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: vitravels-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CHAT_TOKEN_SECRET
+        sync: false
+      - key: CHAT_SERVICE_SECRET
+        sync: false
