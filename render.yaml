@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: vitravels-backend
+    name: vitravel-backend
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
